@@ -2,7 +2,7 @@ name: Build ygege external repo image
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # toutes les 30 minutes
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -62,7 +62,11 @@ jobs:
           IMAGE="ghcr.io/${{ github.repository_owner }}/ygege"
           SHA="${{ steps.sha.outputs.sha }}"
 
-          docker build -t $IMAGE:$SHA external
+          docker build \
+            -t $IMAGE:$SHA \
+            -f external/ygege/docker/Dockerfile \
+            external
+
           docker tag $IMAGE:$SHA $IMAGE:latest
 
           docker push $IMAGE:$SHA
