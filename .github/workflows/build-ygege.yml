@@ -68,6 +68,8 @@ jobs:
           file: external/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ github.repository_owner }}/ygege:latest
             ghcr.io/${{ github.repository_owner }}/ygege:${{ steps.sha.outputs.sha }}
@@ -79,12 +81,8 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # Commit BEFORE pulling to avoid unstaged changes error
           git add .ygege_last_sha
           git commit -m "Update last SHA to ${{ steps.sha.outputs.sha }}"
 
-          # Rebase safely
           git pull --rebase
-
-          # Push updated SHA file
           git push
