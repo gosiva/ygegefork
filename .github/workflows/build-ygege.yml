@@ -10,10 +10,13 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
       - name: Checkout external repo
         uses: actions/checkout@v4
         with:
@@ -27,20 +30,20 @@ jobs:
           cd external
           echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Download last build SHA
+      - name: Read last SHA
+        id: lastsha
         run: |
-          gh run download --name last-sha || true
+          if [ -f .ygege_last_sha ]; then
+            echo "last=$(cat .ygege_last_sha)" >> $GITHUB_OUTPUT
+          else
+            echo "last=none" >> $GITHUB_OUTPUT
+          fi
 
       - name: Compare SHAs
         id: compare
         run: |
-          if [ -f last_sha.txt ]; then
-            LAST=$(cat last_sha.txt)
-            if [ "$LAST" = "${{ steps.sha.outputs.sha }}" ]; then
-              echo "changed=false" >> $GITHUB_OUTPUT
-            else
-              echo "changed=true" >> $GITHUB_OUTPUT
-            fi
+          if [ "${{ steps.lastsha.outputs.last }}" = "${{ steps.sha.outputs.sha }}" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
@@ -69,13 +72,12 @@ jobs:
           docker push $IMAGE:$SHA
           docker push $IMAGE:latest
 
-      - name: Save new SHA
+      - name: Update SHA file
         if: steps.compare.outputs.changed == 'true'
-        run: echo "${{ steps.sha.outputs.sha }}" > last_sha.txt
-
-      - name: Upload new SHA
-        if: steps.compare.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: last-sha
-          path: last_sha.txt
+        run: |
+          echo "${{ steps.sha.outputs.sha }}" > .ygege_last_sha
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .ygege_last_sha
+          git commit -m "Update last SHA to ${{ steps.sha.outputs.sha }}"
+          git push
