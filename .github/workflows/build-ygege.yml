@@ -28,11 +28,8 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       - name: Download last build SHA
-        uses: actions/download-artifact@v4
-        with:
-          name: last-sha
-          path: .
-        continue-on-error: true
+        run: |
+          gh run download --name last-sha || true
 
       - name: Compare SHAs
         id: compare
@@ -64,7 +61,7 @@ jobs:
 
           docker build \
             -t $IMAGE:$SHA \
-            -f external/ygege/docker/Dockerfile \
+            -f external/docker/Dockerfile \
             external
 
           docker tag $IMAGE:$SHA $IMAGE:latest
