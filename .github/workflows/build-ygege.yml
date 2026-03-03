@@ -78,7 +78,13 @@ jobs:
           echo "${{ steps.sha.outputs.sha }}" > .ygege_last_sha
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase
+
+          # Commit BEFORE pulling to avoid unstaged changes error
           git add .ygege_last_sha
           git commit -m "Update last SHA to ${{ steps.sha.outputs.sha }}"
+
+          # Rebase safely
+          git pull --rebase
+
+          # Push updated SHA file
           git push
