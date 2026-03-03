@@ -1,0 +1,80 @@
+name: Build ygege external repo image
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # toutes les 30 minutes
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout external repo
+        uses: actions/checkout@v4
+        with:
+          repository: Obijc/ygege
+          ref: main
+          path: external
+
+      - name: Get external repo commit
+        id: sha
+        run: |
+          cd external
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Download last build SHA
+        uses: actions/download-artifact@v4
+        with:
+          name: last-sha
+          path: .
+        continue-on-error: true
+
+      - name: Compare SHAs
+        id: compare
+        run: |
+          if [ -f last_sha.txt ]; then
+            LAST=$(cat last_sha.txt)
+            if [ "$LAST" = "${{ steps.sha.outputs.sha }}" ]; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+            else
+              echo "changed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.compare.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: steps.compare.outputs.changed == 'true'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push image
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/ygege"
+          SHA="${{ steps.sha.outputs.sha }}"
+
+          docker build -t $IMAGE:$SHA external
+          docker tag $IMAGE:$SHA $IMAGE:latest
+
+          docker push $IMAGE:$SHA
+          docker push $IMAGE:latest
+
+      - name: Save new SHA
+        if: steps.compare.outputs.changed == 'true'
+        run: echo "${{ steps.sha.outputs.sha }}" > last_sha.txt
+
+      - name: Upload new SHA
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-sha
+          path: last_sha.txt
